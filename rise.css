@@ -1,0 +1,28 @@
+div.highlight {
+    background-color: #FBFB7F;
+    display: inline;
+}
+
+div.blue {
+    color: #3C93DC;
+    display: inline;
+}
+
+div.gray {
+    color: #D5D5D5;
+    display: inline;
+}
+
+div.header {
+    position: absolute;
+    top: -200px; 
+    left: 10px; 
+    z-index:500; 
+    font-size:100px;
+}
+
+.slides {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
