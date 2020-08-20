@@ -1,0 +1,5 @@
+renv/library
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
