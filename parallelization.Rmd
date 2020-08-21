@@ -367,7 +367,14 @@ times
 
 Parallelization across 2 cores gets almost exactly 2x speed up
 
-Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains
+---
+
+# Now lets check the output 
+
+Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains 
+
+`furrr` is generally slightly faster than `dopar` in addition to being better coding
+
 
 ---
 

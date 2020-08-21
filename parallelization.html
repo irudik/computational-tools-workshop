@@ -358,7 +358,7 @@ time &lt;- toc()
 ```
 
 ```
-## 59.349 sec elapsed
+## 87.276 sec elapsed
 ```
 
 ```r
@@ -384,7 +384,7 @@ time &lt;- toc()
 ```
 
 ```
-## 33.206 sec elapsed
+## 34.781 sec elapsed
 ```
 
 ```r
@@ -412,7 +412,7 @@ time &lt;- toc()
 ```
 
 ```
-## 28.819 sec elapsed
+## 31.116 sec elapsed
 ```
 
 ```r
@@ -433,18 +433,27 @@ times
 ```
 ## $serial_feols
 ## elapsed 
-##  59.349 
+##  87.276 
 ## 
 ## $dopar_feols
 ## elapsed 
-##  33.206 
+##  34.781 
 ## 
 ## $furrr_feols
 ## elapsed 
-##  28.819
+##  31.116
 ```
 
-Parallelization lead to a pretty significant speed up!
+Parallelization across 2 cores gets almost exactly 2x speed up
+
+---
+
+# Now lets check the output 
+
+Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains 
+
+`furrr` is generally slightly faster than `dopar` in addition to being better coding
+
 
 ---
 
@@ -465,12 +474,12 @@ bind_rows(serial_feols, dopar_feols, furrr_feols) %&gt;%
 ## # A tibble: 3 x 2
 ##   type   `sd(value)`
 ##   &lt;chr&gt;        &lt;dbl&gt;
-## 1 dopar        0.251
-## 2 furrr        0.262
+## 1 dopar        0.258
+## 2 furrr        0.209
 ## 3 serial       0.222
 ```
 
-We get similar standard error estimates
+We get similar standard error estimates with `\(N=100\)` resamples
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
