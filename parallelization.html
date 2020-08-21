@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Parallelization</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Ivan Rudik" />
+    <script src="parallelization_files/header-attrs/header-attrs.js"></script>
+    <link href="parallelization_files/remark-css/default.css" rel="stylesheet" />
+    <link href="parallelization_files/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="parallelization_files/remark-css/metropolis-fonts.css" rel="stylesheet" />
+    <link href="parallelization_files/tile-view/tile-view.css" rel="stylesheet" />
+    <script src="parallelization_files/tile-view/tile-view.js"></script>
+    <link href="parallelization_files/panelset/panelset.css" rel="stylesheet" />
+    <script src="parallelization_files/panelset/panelset.js"></script>
+    <script src="parallelization_files/xaringanExtra-webcam/webcam.js"></script>
+    <script id="xaringanExtra-webcam-options" type="application/json">{"width":"200","height":"200","margin":"1em"}</script>
+    <link rel="stylesheet" href="my-css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Parallelization
+## Julia, R, Stata, and batch jobs
+### Ivan Rudik
+### Computational tools for social scientists
+
+---
+
+exclude: true
+
+```r
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(
+  tidyverse, xaringanExtra, Ryacas, rlang
+)
+options(htmltools.dir.version = FALSE)
+knitr::opts_hooks$set(fig.callout = function(options) {
+  if (options$fig.callout) {
+    options$echo &lt;- FALSE
+  }
+knitr::opts_chunk$set(echo = TRUE, fig.align="center")
+  options
+})
+```
+
+
+```
+## Warning: 'xaringanExtra::style_panelset' is deprecated.
+## Use 'style_panelset_tabs' instead.
+## See help("Deprecated")
+```
+
+```
+## Warning in style_panelset_tabs(...): The arguments to `syle_panelset()` changed in xaringanExtra 0.1.0. Please refer to the documentation to update your slides.
+```
+
+&lt;style type="text/css"&gt;
+/* custom.css */
+.left-code {
+  color: #777;
+  width: 38%;
+  height: 92%;
+  float: left;
+}
+.right-plot {
+  width: 60%;
+  float: right;
+  padding-left: 1%;
+}
+.plot-callout {
+  height: 225px;
+  width: 450px;
+  bottom: 5%;
+  right: 5%;
+  position: absolute;
+  padding: 0px;
+  z-index: 100;
+}
+.plot-callout img {
+  width: 100%;
+  border: 4px solid #23373B;
+}
+&lt;/style&gt;
+
+---
+
+# Why does parallelization matter?
+
+Procedures in economics often require the execution of many independent jobs:
+
+--
+
+.hi-blue[Bootstrap:] estimate model on independent re-samples of the data
+
+--
+
+.hi-blue[Fixed effects estimation:] method underlying `reghdfe`, `lfe::felm` (method of alternating projections) has components that can be done in parallel
+
+--
+
+.hi-blue[Value function iteration:] set of independent Bellman-maximization problems on a state space grid
+
+--
+
+.hi-blue[Raster operations:] if you need to perform transformations, reprojections, etc
+
+--
+
+.hi-blue[Any data processing over multiple years, states:] These are probably independent, can be written as a function
+
+---
+
+# Why does parallelization matter?
+
+These tasks can be significantly sped up by executing them in parallel
+
+--
+
+Doing things in parallel is different across languages, platforms
+
+--
+
+Here we will see how to do parallel computing in Stata, R, and Julia
+  - everything on a 2 core laptop
+
+--
+
+We will also see how to do massive parallel computing on BioHPC via batch job submission with SLURM
+
+---
+
+# Stata
+
+How do we parallelize in Stata?
+
+Step 1: Buy StataMP  
+Step 2: Run StataMP
+
+--
+
+.pull-left[
+
+![Stata is pricey](images/stata.png)
+]
+
+.pull-right[
+
+![Stata is pricey](images/stata_speeds.png)
+
+]
+
+---
+
+# Stata
+
+Parallelization in Stata is *relatively* straightforward because you don't have to do anything
+
+--
+
+Many common functions are parallelized (e.g. reshape, replace, destring, sort)
+
+--
+
+Keep in mind you wont often get N times speed up with N cores
+
+--
+
+Stata also doesn't auto-parallelize some obvious ones like bootstrapping
+
+--
+
+You can get around this by parallelizing batch calls to Stata using `parallel` at [https://github.com/gvegayon/parallel](https://github.com/gvegayon/parallel)
+
+--
+
+Or just do it in serial, you don't need to parallelize everything
+
+---
+
+# R
+
+You don't need to pay to parallelize in R (nice)
+
+--
+
+There's a lot of different ways to do it though
+
+--
+
+I'll just be going over two ways that use the `future` and `furrr` packages:
+   - Loops
+   - Apply/map
+
+I'd generally recommend the `apply` and `map` family of functions over loops for parallelizing, it forces you to code in terms of functions and makes your code cleaner
+
+--
+
+Use loops when future iterations depend on previous iterations
+
+---
+
+# R
+
+Required packages for the R code: `tidyverse, broom, tictoc, lfe, fixest, furrr, doFuture`
+
+--
+
+The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the `renv` package
+
+--
+
+What we will be doing in parallel is .hi-red[bootstrapping standard errors]
+
+--
+
+Main idea in case you forgot:
+
+1. Resample dataset N times with replacement
+2. Estimate the model on the N resampled datasets
+3. Standard deviation of your estimate of interest across the N datasets is your estimated standard error
+
+---
+
+# R Step 1: Load packages
+
+First you've gotta load your packages
+
+
+```r
+# Load packages via pacman package manager
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(
+  tidyverse, tictoc, doFuture,
+  fixest, broom, furrr, renv
+)
+```
+
+You can alternatively use the usual `library` loaders but `pacman` is nice and auto-installs new packages
+
+---
+
+# R Step 2: Initialize parallel processing infrastructure
+
+Next, you need to let your compute know you're going to do parallel processing
+
+
+```r
+registerDoFuture()
+plan(multiprocess)
+```
+
+`registerDoFuture()` spins up the parallel computing infrastructure
+
+
+`plan(multiprocess)` lets the computer know your plan for doing computing (serially, multicore, multithreaded, etc)
+
+---
+
+# R Step 3: Initialize RNG seed
+
+For reproducibility, we need to set a seed for our random number generator
+
+
+```r
+set.seed(1234321)
+```
+
+This makes sure that we get the same result each time we (or someone else) run our code even though the re-sampling is done "randomly"
+
+---
+
+# R Step 4: Load in data
+
+Read in the csv, this is just a dataset on biodiversity and economic development
+
+
+```r
+df &lt;- read_csv("data/final_panel.csv")
+df
+```
+
+```
+## # A tibble: 60,512 x 7
+##    abundance  gdppc location_id  year temp_avg precip_avg state
+##        &lt;dbl&gt;  &lt;dbl&gt;       &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;      &lt;dbl&gt; &lt;dbl&gt;
+##  1      3288 38225.           1  1992     5.66       162.    27
+##  2      2220 42840.           1  1996     5.35       162.    27
+##  3       542 28387.           7  1990    12.7        124.    35
+##  4       536 28724.           7  1991    12.5        124.    35
+##  5      1206 29172.           7  1992    12.5        124.    35
+##  6      1581 30144.           7  1993    12.6        123.    35
+##  7       863 30986.           7  1994    12.8        122.    35
+##  8      1196 31574.           7  1995    13.0        121.    35
+##  9       440 31941.           7  1996    13.2        120.    35
+## 10      1446 32522.           7  1997    13.4        121.    35
+## # … with 60,502 more rows
+```
+
+---
+
+# R Step 5: Define parameters
+
+Next we need to decide how many bootstrap samples we want, and we need to initialize a list for the execution times, and a data.frame for the output
+
+
+```r
+# Number of bootstrap resamples
+N &lt;- 100
+
+# initialize list of times
+times &lt;- list()
+
+# initialize storage df
+bootstrap_samples &lt;- tibble()
+```
+
+---
+
+# R Step 6: Define function
+
+Next we need to define our bootstrap function for estimation
+
+
+```r
+bootstrap_ses &lt;- function(N) {
+  df %&gt;% 
+    dplyr::sample_frac(replace = TRUE) %&gt;% 
+    fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg + interact(year, state) |
+                    location_id + year, data = .) %&gt;% 
+    broom::tidy() %&gt;% 
+    dplyr::filter(stringr::str_detect(term, "gdppc")) %&gt;% 
+    dplyr::select(estimate)
+}
+```
+
+This function:
+
+1. resamples the dataset with replacement
+2. estimates a fixed effect model with `fixest::feols`
+3. recovers the coefficient on `log(gdppc)`
+
+
+---
+
+# R Step 7: Execute the function
+
+First lets run it sequentially to get a sense of the baseline:
+
+
+```r
+tic()
+serial_feols &lt;- replicate(N, bootstrap_ses(N)) %&gt;% 
+  unlist() %&gt;% 
+  as_tibble() %&gt;% 
+  mutate(type = "serial")
+time &lt;- toc()
+```
+
+```
+## 59.349 sec elapsed
+```
+
+```r
+times[["serial_feols"]] &lt;- time$toc - time$tic
+```
+
+---
+
+# R Step 7: Execute the function
+
+Next, lets run it in parallel using a parallel for loop
+
+
+```r
+tic()
+dopar_feols &lt;- foreach(n = seq(N)) %dopar% {
+  bootstrap_ses()
+} %&gt;% 
+  unlist() %&gt;% 
+  as_tibble() %&gt;% 
+  mutate(type = "dopar")
+time &lt;- toc()
+```
+
+```
+## 33.206 sec elapsed
+```
+
+```r
+times[["dopar_feols"]] &lt;- time$toc - time$tic
+```
+
+---
+
+# R Step 7: Execute the function
+
+Next, lets run it in parallel using `furrr::future_map_dfr`
+
+
+```r
+tic()
+furrr_feols &lt;- future_map_dfr(
+  seq(N), 
+  bootstrap_ses, 
+  .options = future_options(globals = "df")
+  ) %&gt;% 
+  unlist() %&gt;% 
+  as_tibble() %&gt;% 
+  mutate(type = "furrr")
+time &lt;- toc()
+```
+
+```
+## 28.819 sec elapsed
+```
+
+```r
+times[["furrr_feols"]] &lt;- time$toc - time$tic
+```
+
+---
+
+# Now lets check the output 
+
+Now lets look at what we got:
+
+
+```r
+times
+```
+
+```
+## $serial_feols
+## elapsed 
+##  59.349 
+## 
+## $dopar_feols
+## elapsed 
+##  33.206 
+## 
+## $furrr_feols
+## elapsed 
+##  28.819
+```
+
+Parallelization lead to a pretty significant speed up!
+
+---
+
+# Now lets check the output 
+
+
+```r
+bind_rows(serial_feols, dopar_feols, furrr_feols) %&gt;% 
+  group_by(type) %&gt;% 
+  summarise(sd(value))
+```
+
+```
+## `summarise()` ungrouping output (override with `.groups` argument)
+```
+
+```
+## # A tibble: 3 x 2
+##   type   `sd(value)`
+##   &lt;chr&gt;        &lt;dbl&gt;
+## 1 dopar        0.251
+## 2 furrr        0.262
+## 3 serial       0.222
+```
+
+We get similar standard error estimates
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
