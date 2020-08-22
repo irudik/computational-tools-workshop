@@ -117,7 +117,7 @@ We will also see how to do massive parallel computing on BioHPC via batch job su
 
 How do we parallelize in Stata?
 
-Step 1: Buy StataMP  
+Step 1: Buy StataMP
 Step 2: Run StataMP
 
 --
@@ -267,7 +267,7 @@ Next we need to decide how many bootstrap samples we want, and we need to initia
 
 ```{r}
 # Number of bootstrap resamples
-N <- 100
+N <- 200
 
 # initialize list of times
 times <- list()
@@ -284,12 +284,12 @@ Next we need to define our bootstrap function for estimation
 
 ```{r}
 bootstrap_ses <- function(N) {
-  df %>% 
-    dplyr::sample_frac(replace = TRUE) %>% 
+  df %>%
+    dplyr::sample_frac(replace = TRUE) %>%
     fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg + interact(year, state) |
-                    location_id + year, data = .) %>% 
-    broom::tidy() %>% 
-    dplyr::filter(stringr::str_detect(term, "gdppc")) %>% 
+                    location_id + year, data = .) %>%
+    broom::tidy() %>%
+    dplyr::filter(stringr::str_detect(term, "gdppc")) %>%
     dplyr::select(estimate)
 }
 ```
@@ -309,9 +309,9 @@ First lets run it sequentially to get a sense of the baseline:
 
 ```{r}
 tic()
-serial_feols <- replicate(N, bootstrap_ses(N)) %>% 
-  unlist() %>% 
-  as_tibble() %>% 
+serial_feols <- replicate(N, bootstrap_ses(N)) %>%
+  unlist() %>%
+  as_tibble() %>%
   mutate(type = "serial")
 time <- toc()
 times[["serial_feols"]] <- time$toc - time$tic
@@ -327,9 +327,9 @@ Next, lets run it in parallel using a parallel for loop
 tic()
 dopar_feols <- foreach(n = seq(N)) %dopar% {
   bootstrap_ses()
-} %>% 
-  unlist() %>% 
-  as_tibble() %>% 
+} %>%
+  unlist() %>%
+  as_tibble() %>%
   mutate(type = "dopar")
 time <- toc()
 times[["dopar_feols"]] <- time$toc - time$tic
@@ -344,12 +344,12 @@ Next, lets run it in parallel using `furrr::future_map_dfr`
 ```{r}
 tic()
 furrr_feols <- future_map_dfr(
-  seq(N), 
-  bootstrap_ses, 
+  seq(N),
+  bootstrap_ses,
   .options = future_options(globals = "df")
-  ) %>% 
-  unlist() %>% 
-  as_tibble() %>% 
+  ) %>%
+  unlist() %>%
+  as_tibble() %>%
   mutate(type = "furrr")
 time <- toc()
 times[["furrr_feols"]] <- time$toc - time$tic
@@ -357,7 +357,7 @@ times[["furrr_feols"]] <- time$toc - time$tic
 
 ---
 
-# Now lets check the output 
+# Now lets check the output
 
 Now lets look at what we got:
 
@@ -369,21 +369,243 @@ Parallelization across 2 cores gets almost exactly 2x speed up
 
 ---
 
-# Now lets check the output 
+# Now lets check the output
 
-Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains 
+Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains
 
 `furrr` is generally slightly faster than `dopar` in addition to being better coding
 
 
 ---
 
-# Now lets check the output 
+# Now lets check the output
 
 ```{r}
-bind_rows(serial_feols, dopar_feols, furrr_feols) %>% 
-  group_by(type) %>% 
+bind_rows(serial_feols, dopar_feols, furrr_feols) %>%
+  group_by(type) %>%
   summarise(sd(value))
 ```
 
-We get similar standard error estimates with $N=100$ resamples
+We get similar standard error estimates
+
+---
+
+# Julia
+
+You also don't need to pay to parallelize in R (nice)
+
+--
+
+There's two main ways to parallelize in Julia, both have pros and cons:
+  - `pmap`
+  - `@distributed`
+
+--
+
+Rule of thumb: use `pmap` with big jobs, use `@distributed` with smaller jobs
+
+---
+
+# Julia: pmap vs distributed
+
+`pmap` is a parallel map
+
+`@distributed` makes a parallel for loop like `%dopar%` in R
+
+--
+
+What's the difference?
+
+--
+
+`@distributed` takes a quick and dirty approach: it just assigns the same number of jobs to each worker
+
+--
+
+This can cause inefficiencies if you have jobs with different execution times, leaving you hanging with one worker with several jobs left to do when they could be spread out over many workers
+
+--
+
+The benefit is it's quick: just send the jobs to the workers and wait
+
+---
+
+# Julia: pmap vs distributed
+
+`pmap` does .hi-blue[load balancing / dynamic scheduling:] it assigns jobs to workers as they complete jobs
+
+--
+
+This makes sure workers are always busy and not idle
+
+--
+
+But there's a fixed cost communication overhead with load balancing: if you have small easy jobs that are similar size, this will dominate the gains from load balancing
+
+---
+
+# Julia
+
+Required packages for the Julia code: `Pkg, Distributed, QRandom, ueryverse, FixedEffectModels, SharedArrays`
+
+--
+
+The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the `renv` package
+
+--
+
+Again, we will be .hi-red[bootstrapping standard errors] in parallel
+
+
+---
+
+# Julia Step 1: Load packages
+
+First you've gotta load your packages onto each worker
+
+```{julia}
+using Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+using Distributed, Random
+```
+
+Julia has very nice built-in package manager, making it easy to generate reproducible code
+
+
+---
+
+# Julia Step 2: Instantiate parallel processing infrastructure
+```{julia}
+# add 1 worker
+addprocs(1)
+
+@everywhere using Pkg
+@everywhere Pkg.activate(".")
+@everywhere Pkg.instantiate()
+@everywhere using Queryverse, FixedEffectModels, SharedArrays
+```
+
+A quirk of Julia is you need to start off loading the packages onto each worker using `@everywhere`
+
+---
+
+# Julia Step 3: Initialize RNG seed
+
+```{julia}
+Random.seed!(1234321)
+```
+
+This makes sure our results are reproducible
+
+---
+
+# Julia Step 4: Load data
+
+```{julia}
+df = DataFrame(load("data/final_panel.csv"))
+```
+
+`Queryverse` is the Julia-equivalent of tidyverse for R
+
+---
+
+# Julia Step 5: Define parameters
+
+```{julia}
+N = 200
+estimates_serial = Vector{Float64}(undef, N)
+estimates_distrib = SharedArray{Float64}(N)
+```
+
+We need to initialize `Array`s for the serial and `@distributed` results, not for `pmap`
+
+---
+
+# Julia Step 6: Define function
+
+Now we define our bootstrap function
+
+```{julia}
+@everywhere function bootstrap_ses(df)
+    bootstrap_df = df[sample(axes(df, 1), nrow(df); replace = true), :]
+    reg_output = reg(bootstrap_df,
+        @formula(log(abundance) ~ log(gdppc) + temp_avg + precip_avg + fe(state)&year + fe(location_id) + fe(year)))
+
+    return reg_output.coef[1]
+end
+```
+
+The `@everywhere` macro makes sure its defined on all workers
+
+---
+
+# Julia Step 7: Execute function (pre-compile)
+
+In Julia you often get massive speed gains by executing your function once before doing your main work
+
+--
+
+This is because it pre-compiles the function
+
+```{julia, echo = FALSE, results = "hide"}
+
+# serial
+@time for i in 1:N
+  estimates_serial[i] = bootstrap_ses(df)
+end
+
+# parallel map
+@time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N])
+
+# distributed
+@time @sync @distributed for i in 1:N
+  estimates_distrib[i] = bootstrap_ses(df)
+end
+```
+
+---
+
+# Julia Step 7: Execute function
+
+First lets run it sequentially
+
+```{julia}
+@time for i in 1:N
+  estimates_serial[i] = bootstrap_ses(df)
+end
+```
+
+
+---
+
+# Julia Step 7: Execute function
+
+First lets use `pmap` to do load-balancing
+
+```{julia}
+@time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N])
+```
+
+
+---
+
+# Julia Step 7: Execute function
+
+Last lets use `@distributed` to do it quick and dirty
+
+```{julia}
+@time @sync @distributed for i in 1:N
+  estimates_distrib[i] = bootstrap_ses(df)
+end
+```
+
+
+---
+
+# Now lets check the output
+
+```{julia}
+results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
+describe(results, :standard_deviation => std)
+```

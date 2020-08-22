@@ -31,6 +31,13 @@ exclude: true
 
 ```r
 if (!require("pacman")) install.packages("pacman")
+```
+
+```
+## Loading required package: pacman
+```
+
+```r
 pacman::p_load(
   tidyverse, xaringanExtra, Ryacas, rlang
 )
@@ -52,7 +59,8 @@ knitr::opts_chunk$set(echo = TRUE, fig.align="center")
 ```
 
 ```
-## Warning in style_panelset_tabs(...): The arguments to `syle_panelset()` changed in xaringanExtra 0.1.0. Please refer to the documentation to update your slides.
+## Warning in style_panelset_tabs(...): The arguments to `syle_panelset()` changed in xaringanExtra 0.1.0. Please refer to the
+## documentation to update your slides.
 ```
 
 &lt;style type="text/css"&gt;
@@ -134,7 +142,7 @@ We will also see how to do massive parallel computing on BioHPC via batch job su
 
 How do we parallelize in Stata?
 
-Step 1: Buy StataMP  
+Step 1: Buy StataMP
 Step 2: Run StataMP
 
 --
@@ -250,6 +258,13 @@ registerDoFuture()
 plan(multiprocess)
 ```
 
+```
+## Warning: [ONE-TIME WARNING] Forked processing ('multicore') is disabled in future (&gt;= 1.13.0) when running R from
+## RStudio, because it is considered unstable. Because of this, plan("multicore") will fall back to plan("sequential"), and
+## plan("multiprocess") will fall back to plan("multisession") - not plan("multicore") as in the past. For more details, how to
+## control forked processing or not, and how to silence this warning in future R sessions, see ?future::supportsMulticore
+```
+
 `registerDoFuture()` spins up the parallel computing infrastructure
 
 
@@ -306,7 +321,7 @@ Next we need to decide how many bootstrap samples we want, and we need to initia
 
 ```r
 # Number of bootstrap resamples
-N &lt;- 100
+N &lt;- 200
 
 # initialize list of times
 times &lt;- list()
@@ -324,12 +339,12 @@ Next we need to define our bootstrap function for estimation
 
 ```r
 bootstrap_ses &lt;- function(N) {
-  df %&gt;% 
-    dplyr::sample_frac(replace = TRUE) %&gt;% 
+  df %&gt;%
+    dplyr::sample_frac(replace = TRUE) %&gt;%
     fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg + interact(year, state) |
-                    location_id + year, data = .) %&gt;% 
-    broom::tidy() %&gt;% 
-    dplyr::filter(stringr::str_detect(term, "gdppc")) %&gt;% 
+                    location_id + year, data = .) %&gt;%
+    broom::tidy() %&gt;%
+    dplyr::filter(stringr::str_detect(term, "gdppc")) %&gt;%
     dplyr::select(estimate)
 }
 ```
@@ -350,15 +365,15 @@ First lets run it sequentially to get a sense of the baseline:
 
 ```r
 tic()
-serial_feols &lt;- replicate(N, bootstrap_ses(N)) %&gt;% 
-  unlist() %&gt;% 
-  as_tibble() %&gt;% 
+serial_feols &lt;- replicate(N, bootstrap_ses(N)) %&gt;%
+  unlist() %&gt;%
+  as_tibble() %&gt;%
   mutate(type = "serial")
 time &lt;- toc()
 ```
 
 ```
-## 87.276 sec elapsed
+## 82.231 sec elapsed
 ```
 
 ```r
@@ -376,15 +391,15 @@ Next, lets run it in parallel using a parallel for loop
 tic()
 dopar_feols &lt;- foreach(n = seq(N)) %dopar% {
   bootstrap_ses()
-} %&gt;% 
-  unlist() %&gt;% 
-  as_tibble() %&gt;% 
+} %&gt;%
+  unlist() %&gt;%
+  as_tibble() %&gt;%
   mutate(type = "dopar")
 time &lt;- toc()
 ```
 
 ```
-## 34.781 sec elapsed
+## 48.807 sec elapsed
 ```
 
 ```r
@@ -401,18 +416,18 @@ Next, lets run it in parallel using `furrr::future_map_dfr`
 ```r
 tic()
 furrr_feols &lt;- future_map_dfr(
-  seq(N), 
-  bootstrap_ses, 
+  seq(N),
+  bootstrap_ses,
   .options = future_options(globals = "df")
-  ) %&gt;% 
-  unlist() %&gt;% 
-  as_tibble() %&gt;% 
+  ) %&gt;%
+  unlist() %&gt;%
+  as_tibble() %&gt;%
   mutate(type = "furrr")
 time &lt;- toc()
 ```
 
 ```
-## 31.116 sec elapsed
+## 45.498 sec elapsed
 ```
 
 ```r
@@ -421,7 +436,7 @@ times[["furrr_feols"]] &lt;- time$toc - time$tic
 
 ---
 
-# Now lets check the output 
+# Now lets check the output
 
 Now lets look at what we got:
 
@@ -433,36 +448,36 @@ times
 ```
 ## $serial_feols
 ## elapsed 
-##  87.276 
+##  82.231 
 ## 
 ## $dopar_feols
 ## elapsed 
-##  34.781 
+##  48.807 
 ## 
 ## $furrr_feols
 ## elapsed 
-##  31.116
+##  45.498
 ```
 
 Parallelization across 2 cores gets almost exactly 2x speed up
 
 ---
 
-# Now lets check the output 
+# Now lets check the output
 
-Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains 
+Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains
 
 `furrr` is generally slightly faster than `dopar` in addition to being better coding
 
 
 ---
 
-# Now lets check the output 
+# Now lets check the output
 
 
 ```r
-bind_rows(serial_feols, dopar_feols, furrr_feols) %&gt;% 
-  group_by(type) %&gt;% 
+bind_rows(serial_feols, dopar_feols, furrr_feols) %&gt;%
+  group_by(type) %&gt;%
   summarise(sd(value))
 ```
 
@@ -474,12 +489,383 @@ bind_rows(serial_feols, dopar_feols, furrr_feols) %&gt;%
 ## # A tibble: 3 x 2
 ##   type   `sd(value)`
 ##   &lt;chr&gt;        &lt;dbl&gt;
-## 1 dopar        0.258
-## 2 furrr        0.209
-## 3 serial       0.222
+## 1 dopar        0.218
+## 2 furrr        0.237
+## 3 serial       0.236
 ```
 
-We get similar standard error estimates with `\(N=100\)` resamples
+We get similar standard error estimates
+
+---
+
+# Julia
+
+You also don't need to pay to parallelize in R (nice)
+
+--
+
+There's two main ways to parallelize in Julia, both have pros and cons:
+  - `pmap`
+  - `@distributed`
+
+--
+
+Rule of thumb: use `pmap` with big jobs, use `@distributed` with smaller jobs
+
+---
+
+# Julia: pmap vs distributed
+
+`pmap` is a parallel map
+
+`@distributed` makes a parallel for loop like `%dopar%` in R
+
+--
+
+What's the difference?
+
+--
+
+`@distributed` takes a quick and dirty approach: it just assigns the same number of jobs to each worker
+
+--
+
+This can cause inefficiencies if you have jobs with different execution times, leaving you hanging with one worker with several jobs left to do when they could be spread out over many workers
+
+--
+
+The benefit is it's quick: just send the jobs to the workers and wait
+
+---
+
+# Julia: pmap vs distributed
+
+`pmap` does .hi-blue[load balancing / dynamic scheduling:] it assigns jobs to workers as they complete jobs
+
+--
+
+This makes sure workers are always busy and not idle
+
+--
+
+But there's a fixed cost communication overhead with load balancing: if you have small easy jobs that are similar size, this will dominate the gains from load balancing
+
+---
+
+# Julia
+
+Required packages for the Julia code: `Pkg, Distributed, QRandom, ueryverse, FixedEffectModels, SharedArrays`
+
+--
+
+The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the `renv` package
+
+--
+
+Again, we will be .hi-red[bootstrapping standard errors] in parallel
+
+
+---
+
+# Julia Step 1: Load packages
+
+First you've gotta load your packages onto each worker
+
+
+```julia
+using Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+using Distributed, Random
+```
+
+Julia has very nice built-in package manager, making it easy to generate reproducible code
+
+
+---
+
+# Julia Step 2: Instantiate parallel processing infrastructure
+
+```julia
+# add 1 worker
+addprocs(1)
+```
+
+```
+## 1-element Array{Int64,1}:
+##  5
+```
+
+```julia
+
+@everywhere using Pkg
+@everywhere Pkg.activate(".")
+```
+
+```
+##       From worker 2:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
+##       From worker 3:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
+##       From worker 5:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
+##       From worker 4:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
+```
+
+```julia
+@everywhere Pkg.instantiate()
+@everywhere using Queryverse, FixedEffectModels, SharedArrays
+```
+
+A quirk of Julia is you need to start off loading the packages onto each worker using `@everywhere`
+
+---
+
+# Julia Step 3: Initialize RNG seed
+
+
+```julia
+Random.seed!(1234321)
+```
+
+```
+## MersenneTwister(UInt32[0x0012d591], Random.DSFMT.DSFMT_state(Int32[-1066020669, 1073631810, 397127531, 1072701603, -312796895, 1073626997, 1020815149, 1073320576, 650048908, 1073512247  …  -352178910, 1073735534, 1816227101, 1072823316, -1468787611, -2121692099, 358864500, -310934288, 382, 0]), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], UInt128[0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000  …  0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000, 0x00000000000000000000000000000000], 1002, 0)
+```
+
+This makes sure our results are reproducible
+
+---
+
+# Julia Step 4: Load data
+
+
+```julia
+df = DataFrame(load("data/final_panel.csv"))
+```
+
+```
+## 60512×7 DataFrame. Omitted printing of 1 columns
+## │ Row   │ abundance │ gdppc   │ location_id │ year  │ temp_avg │ precip_avg │
+## │       │ Float64   │ Float64 │ Int64       │ Int64 │ Float64  │ Float64    │
+## ├───────┼───────────┼─────────┼─────────────┼───────┼──────────┼────────────┤
+## │ 1     │ 3288.0    │ 38225.3 │ 1           │ 1992  │ 5.66217  │ 162.065    │
+## │ 2     │ 2220.0    │ 42840.3 │ 1           │ 1996  │ 5.35117  │ 161.835    │
+## │ 3     │ 542.0     │ 28386.8 │ 7           │ 1990  │ 12.6512  │ 123.907    │
+## │ 4     │ 536.0     │ 28723.7 │ 7           │ 1991  │ 12.5427  │ 123.526    │
+## │ 5     │ 1206.0    │ 29172.2 │ 7           │ 1992  │ 12.4691  │ 123.882    │
+## │ 6     │ 1581.0    │ 30144.2 │ 7           │ 1993  │ 12.5805  │ 122.682    │
+## │ 7     │ 863.0     │ 30985.9 │ 7           │ 1994  │ 12.7852  │ 121.862    │
+## ⋮
+## │ 60505 │ 41881.5   │ 40464.5 │ 30185       │ 2006  │ 10.4133  │ 122.89     │
+## │ 60506 │ 34425.5   │ 40821.8 │ 30185       │ 2007  │ 10.3946  │ 123.305    │
+## │ 60507 │ 29837.7   │ 41114.4 │ 30185       │ 2008  │ 10.3504  │ 122.486    │
+## │ 60508 │ 7102.4    │ 40369.0 │ 30185       │ 2009  │ 10.2743  │ 121.816    │
+## │ 60509 │ 24805.6   │ 41093.7 │ 30185       │ 2010  │ 10.1337  │ 121.996    │
+## │ 60510 │ 21776.8   │ 41433.9 │ 30185       │ 2011  │ 10.1011  │ 120.375    │
+## │ 60511 │ 22725.9   │ 42033.8 │ 30185       │ 2012  │ 10.1315  │ 120.391    │
+## │ 60512 │ 43839.5   │ 42346.5 │ 30185       │ 2013  │ 10.0043  │ 120.174    │
+```
+
+`Queryverse` is the Julia-equivalent of tidyverse for R
+
+---
+
+# Julia Step 5: Define parameters
+
+
+```julia
+N = 200
+```
+
+```
+## 200
+```
+
+```julia
+estimates_serial = Vector{Float64}(undef, N)
+```
+
+```
+## 200-element Array{Float64,1}:
+##  2.524253107e-314
+##  2.516834897e-314
+##  2.516834897e-314
+##  2.534278624e-314
+##  2.524253629e-314
+##  2.5242536763e-314
+##  2.524253787e-314
+##  2.534324062e-314
+##  2.534278624e-314
+##  2.534278624e-314
+##  ⋮
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+```
+
+```julia
+estimates_distrib = SharedArray{Float64}(N)
+```
+
+```
+## 200-element SharedArray{Float64,1}:
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  ⋮
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+##  0.0
+```
+
+We need to initialize `Array`s for the serial and `@distributed` results, not for `pmap`
+
+---
+
+# Julia Step 6: Define function
+
+Now we define our bootstrap function
+
+
+```julia
+@everywhere function bootstrap_ses(df)
+    bootstrap_df = df[sample(axes(df, 1), nrow(df); replace = true), :]
+    reg_output = reg(bootstrap_df,
+        @formula(log(abundance) ~ log(gdppc) + temp_avg + precip_avg + fe(state)&amp;year + fe(location_id) + fe(year)))
+
+    return reg_output.coef[1]
+end
+```
+
+The `@everywhere` macro makes sure its defined on all workers
+
+---
+
+# Julia Step 7: Execute function (pre-compile)
+
+In Julia you often get massive speed gains by executing your function once before doing your main work
+
+--
+
+This is because it pre-compiles the function
+
+
+
+---
+
+# Julia Step 7: Execute function
+
+First lets run it sequentially
+
+
+```julia
+@time for i in 1:N
+  estimates_serial[i] = bootstrap_ses(df)
+end
+```
+
+```
+##  78.670377 seconds (24.58 M allocations: 6.040 GiB, 1.39% gc time)
+```
+
+
+---
+
+# Julia Step 7: Execute function
+
+First lets use `pmap` to do load-balancing
+
+
+```julia
+@time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N])
+```
+
+```
+##  40.957485 seconds (91.88 k allocations: 4.357 MiB)
+```
+
+```
+## 200-element Array{Float64,1}:
+##  -2.1850548552145126
+##  -1.9104644432970979
+##  -1.9195375298288864
+##  -1.797223553332161
+##  -1.7199477652754513
+##  -2.140085618508063
+##  -1.4351996101005642
+##  -1.9761090424893981
+##  -1.7999134773140564
+##  -1.871430002289791
+##   ⋮
+##  -1.6766468584858916
+##  -2.0652381445867203
+##  -1.7035183695353033
+##  -1.6243098274107959
+##  -1.987560282350165
+##  -1.767563905663622
+##  -1.9977068014329598
+##  -1.7618661078969544
+##  -1.423693595440335
+```
+
+
+---
+
+# Julia Step 7: Execute function
+
+Last lets use `@distributed` to do it quick and dirty
+
+
+```julia
+@time @sync @distributed for i in 1:N
+  estimates_distrib[i] = bootstrap_ses(df)
+end
+```
+
+```
+##  40.408428 seconds (159.28 k allocations: 8.044 MiB)
+```
+
+```
+## Task (done) @0x00000001410eb850
+```
+
+
+---
+
+# Now lets check the output
+
+
+```julia
+results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
+describe(results, :standard_deviation =&gt; std)
+```
+
+```
+## 3×2 DataFrame
+## │ Row │ variable │ standard_deviation │
+## │     │ Symbol   │ Float64            │
+## ├─────┼──────────┼────────────────────┤
+## │ 1   │ serial   │ 0.257461           │
+## │ 2   │ pmap     │ 0.234705           │
+## │ 3   │ distrib  │ 0.222439           │
+```
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
