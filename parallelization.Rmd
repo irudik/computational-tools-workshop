@@ -1,6 +1,6 @@
 ---
 title: "Parallelization"
-subtitle: "Julia, R, Stata, and batch jobs"
+subtitle: "Julia, R, Stata"
 author: Ivan Rudik
 date: Computational tools for social scientists
 output:
@@ -106,10 +106,6 @@ Doing things in parallel is different across languages, platforms
 
 Here we will see how to do parallel computing in Stata, R, and Julia
   - everything on a 2 core laptop
-
---
-
-We will also see how to do massive parallel computing on BioHPC via batch job submission with SLURM
 
 ---
 
@@ -326,7 +322,7 @@ Next, lets run it in parallel using a parallel for loop
 ```{r}
 tic()
 dopar_feols <- foreach(n = seq(N)) %dopar% {
-  bootstrap_ses()
+  bootstrap_ses(n)
 } %>%
   unlist() %>%
   as_tibble() %>%
@@ -375,6 +371,9 @@ Estimation is relatively expensive so the fixed costs of parallelizing aren't th
 
 `furrr` is generally slightly faster than `dopar` in addition to being better coding
 
+--
+
+Clone the github repo and use `parallelization_server.R` on the BioHPC servers to see if $#$ cores speed-up holds more generally
 
 ---
 
@@ -446,7 +445,7 @@ But there's a fixed cost communication overhead with load balancing: if you have
 
 # Julia
 
-Required packages for the Julia code: `Pkg, Distributed, QRandom, ueryverse, FixedEffectModels, SharedArrays`
+Required packages for the Julia code: `Pkg, Distributed, Random, DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics`
 
 --
 
@@ -609,3 +608,7 @@ end
 results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
 describe(results, :standard_deviation => std)
 ```
+
+--
+
+Clone the github repo and use `parallelization_server.jl` on the BioHPC servers to see if $#$ cores speed-up holds more generally

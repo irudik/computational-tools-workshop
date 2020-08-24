@@ -21,7 +21,7 @@
 class: center, middle, inverse, title-slide
 
 # Parallelization
-## Julia, R, Stata, and batch jobs
+## Julia, R, Stata
 ### Ivan Rudik
 ### Computational tools for social scientists
 
@@ -59,8 +59,8 @@ knitr::opts_chunk$set(echo = TRUE, fig.align="center")
 ```
 
 ```
-## Warning in style_panelset_tabs(...): The arguments to `syle_panelset()` changed in xaringanExtra 0.1.0. Please refer to the
-## documentation to update your slides.
+## Warning in style_panelset_tabs(...): The arguments to `syle_panelset()` changed
+## in xaringanExtra 0.1.0. Please refer to the documentation to update your slides.
 ```
 
 &lt;style type="text/css"&gt;
@@ -131,10 +131,6 @@ Doing things in parallel is different across languages, platforms
 
 Here we will see how to do parallel computing in Stata, R, and Julia
   - everything on a 2 core laptop
-
---
-
-We will also see how to do massive parallel computing on BioHPC via batch job submission with SLURM
 
 ---
 
@@ -259,10 +255,13 @@ plan(multiprocess)
 ```
 
 ```
-## Warning: [ONE-TIME WARNING] Forked processing ('multicore') is disabled in future (&gt;= 1.13.0) when running R from
-## RStudio, because it is considered unstable. Because of this, plan("multicore") will fall back to plan("sequential"), and
-## plan("multiprocess") will fall back to plan("multisession") - not plan("multicore") as in the past. For more details, how to
-## control forked processing or not, and how to silence this warning in future R sessions, see ?future::supportsMulticore
+## Warning: [ONE-TIME WARNING] Forked processing ('multicore') is disabled
+## in future (&gt;= 1.13.0) when running R from RStudio, because it is
+## considered unstable. Because of this, plan("multicore") will fall
+## back to plan("sequential"), and plan("multiprocess") will fall back to
+## plan("multisession") - not plan("multicore") as in the past. For more details,
+## how to control forked processing or not, and how to silence this warning in
+## future R sessions, see ?future::supportsMulticore
 ```
 
 `registerDoFuture()` spins up the parallel computing infrastructure
@@ -373,7 +372,7 @@ time &lt;- toc()
 ```
 
 ```
-## 82.231 sec elapsed
+## 117.289 sec elapsed
 ```
 
 ```r
@@ -390,7 +389,7 @@ Next, lets run it in parallel using a parallel for loop
 ```r
 tic()
 dopar_feols &lt;- foreach(n = seq(N)) %dopar% {
-  bootstrap_ses()
+  bootstrap_ses(n)
 } %&gt;%
   unlist() %&gt;%
   as_tibble() %&gt;%
@@ -399,7 +398,7 @@ time &lt;- toc()
 ```
 
 ```
-## 48.807 sec elapsed
+## 52.169 sec elapsed
 ```
 
 ```r
@@ -427,7 +426,7 @@ time &lt;- toc()
 ```
 
 ```
-## 45.498 sec elapsed
+## 49.179 sec elapsed
 ```
 
 ```r
@@ -448,15 +447,15 @@ times
 ```
 ## $serial_feols
 ## elapsed 
-##  82.231 
+## 117.289 
 ## 
 ## $dopar_feols
 ## elapsed 
-##  48.807 
+##  52.169 
 ## 
 ## $furrr_feols
 ## elapsed 
-##  45.498
+##  49.179
 ```
 
 Parallelization across 2 cores gets almost exactly 2x speed up
@@ -469,6 +468,9 @@ Estimation is relatively expensive so the fixed costs of parallelizing aren't th
 
 `furrr` is generally slightly faster than `dopar` in addition to being better coding
 
+--
+
+Clone the github repo and use `parallelization_server.R` on the BioHPC servers to see if `\(#\)` cores speed-up holds more generally
 
 ---
 
@@ -489,8 +491,8 @@ bind_rows(serial_feols, dopar_feols, furrr_feols) %&gt;%
 ## # A tibble: 3 x 2
 ##   type   `sd(value)`
 ##   &lt;chr&gt;        &lt;dbl&gt;
-## 1 dopar        0.218
-## 2 furrr        0.237
+## 1 dopar        0.247
+## 2 furrr        0.224
 ## 3 serial       0.236
 ```
 
@@ -554,7 +556,7 @@ But there's a fixed cost communication overhead with load balancing: if you have
 
 # Julia
 
-Required packages for the Julia code: `Pkg, Distributed, QRandom, ueryverse, FixedEffectModels, SharedArrays`
+Required packages for the Julia code: `Pkg, Distributed, Random, DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics`
 
 --
 
@@ -593,7 +595,7 @@ addprocs(1)
 
 ```
 ## 1-element Array{Int64,1}:
-##  5
+##  2
 ```
 
 ```julia
@@ -604,9 +606,6 @@ addprocs(1)
 
 ```
 ##       From worker 2:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
-##       From worker 3:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
-##       From worker 5:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
-##       From worker 4:	 Activating environment at `~/Desktop/git/computational-tools-workshop/Project.toml`
 ```
 
 ```julia
@@ -684,26 +683,26 @@ estimates_serial = Vector{Float64}(undef, N)
 
 ```
 ## 200-element Array{Float64,1}:
-##  2.524253107e-314
-##  2.516834897e-314
-##  2.516834897e-314
-##  2.534278624e-314
-##  2.524253629e-314
-##  2.5242536763e-314
-##  2.524253787e-314
-##  2.534324062e-314
-##  2.534278624e-314
-##  2.534278624e-314
+##  8.0e-323
+##  1.1e-322
+##  2.341884023e-314
+##  2.34188426e-314
+##  1.14e-322
+##  1.53e-322
+##  2.3418843074e-314
+##  2.341884402e-314
+##  1.6e-322
+##  1.6e-322
 ##  ⋮
-##  0.0
-##  0.0
-##  0.0
-##  0.0
-##  0.0
-##  0.0
-##  0.0
-##  0.0
-##  0.0
+##  2.33369394e-314
+##  3.0e-323
+##  3.0e-323
+##  2.3336939796e-314
+##  2.333694019e-314
+##  3.46e-322
+##  3.75e-322
+##  2.3337584216e-314
+##  2.333758382e-314
 ```
 
 ```julia
@@ -781,7 +780,7 @@ end
 ```
 
 ```
-##  78.670377 seconds (24.58 M allocations: 6.040 GiB, 1.39% gc time)
+## 100.018320 seconds (24.58 M allocations: 6.040 GiB, 1.03% gc time)
 ```
 
 
@@ -797,31 +796,31 @@ First lets use `pmap` to do load-balancing
 ```
 
 ```
-##  40.957485 seconds (91.88 k allocations: 4.357 MiB)
+##  72.190139 seconds (91.90 k allocations: 4.361 MiB)
 ```
 
 ```
 ## 200-element Array{Float64,1}:
-##  -2.1850548552145126
-##  -1.9104644432970979
-##  -1.9195375298288864
-##  -1.797223553332161
-##  -1.7199477652754513
-##  -2.140085618508063
-##  -1.4351996101005642
-##  -1.9761090424893981
-##  -1.7999134773140564
-##  -1.871430002289791
+##  -1.7862772250667036
+##  -2.0121505662903134
+##  -1.6061433487039758
+##  -1.5018495318427947
+##  -1.7962719780203111
+##  -1.1038561258574844
+##  -1.9756343074854126
+##  -1.7687836937132388
+##  -2.149461056655686
+##  -2.2679266159211244
 ##   ⋮
-##  -1.6766468584858916
-##  -2.0652381445867203
-##  -1.7035183695353033
-##  -1.6243098274107959
-##  -1.987560282350165
-##  -1.767563905663622
-##  -1.9977068014329598
-##  -1.7618661078969544
-##  -1.423693595440335
+##  -1.7170849833937234
+##  -1.7863593682159598
+##  -1.7631174794262736
+##  -1.753801211384528
+##  -1.7921705734131506
+##  -2.2044695897575823
+##  -2.0072834023582256
+##  -1.920444826009764
+##  -1.6222899401297937
 ```
 
 
@@ -839,11 +838,11 @@ end
 ```
 
 ```
-##  40.408428 seconds (159.28 k allocations: 8.044 MiB)
+##  69.590584 seconds (160.94 k allocations: 8.133 MiB)
 ```
 
 ```
-## Task (done) @0x00000001410eb850
+## Task (done) @0x0000000138c1a410
 ```
 
 
@@ -863,9 +862,13 @@ describe(results, :standard_deviation =&gt; std)
 ## │     │ Symbol   │ Float64            │
 ## ├─────┼──────────┼────────────────────┤
 ## │ 1   │ serial   │ 0.257461           │
-## │ 2   │ pmap     │ 0.234705           │
-## │ 3   │ distrib  │ 0.222439           │
+## │ 2   │ pmap     │ 0.223527           │
+## │ 3   │ distrib  │ 0.241776           │
 ```
+
+--
+
+Clone the github repo and use `parallelization_server.jl` on the BioHPC servers to see if `\(#\)` cores speed-up holds more generally
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
