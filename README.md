@@ -2,7 +2,7 @@
 
 ## Interactive Jupyter notebook with Julia
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://hub.gke2.mybinder.org/user/binder-examples-demo-julia-gg5ir17g/notebooks/demo.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/binder-examples/demo-julia/master)
 
 ## Jupyter notebook slides
 
