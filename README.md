@@ -1,8 +1,12 @@
 # Computational tools for social scientists
 
-## Jupyter notebook introduction
+## Interactive Jupyter notebook with Julia
 
-[Jupyter notebook](https://raw.githack.com/irudik/computational-tools-workshop/master/jupyter-julia-intro.html)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://hub.gke2.mybinder.org/user/binder-examples-demo-julia-gg5ir17g/notebooks/demo.ipynb)
+
+## Jupyter notebook slides
+
+[Slides](https://raw.githack.com/irudik/computational-tools-workshop/master/jupyter-julia-intro.html)
 
 ## Hands on coding and parallel computing in R/Julia
 
