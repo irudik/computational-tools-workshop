@@ -13,7 +13,7 @@ addprocs(convert(Int64, length(Sys.cpu_info())/2))
 @everywhere using Pkg
 @everywhere Pkg.activate(".")
 @everywhere Pkg.instantiate()
-@everywhere using DataFrames, CSVFiles, FixedEffectModels, SharedArrays
+@everywhere using DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase
 
 # set RNG seed
 Random.seed!(1234321)
@@ -65,4 +65,4 @@ end
 end
 
 results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
-describe(results, :standard_deviation => std)
+describe(results, :std)

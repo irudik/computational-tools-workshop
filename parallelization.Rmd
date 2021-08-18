@@ -19,8 +19,9 @@ exclude: true
 ```{r setup}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  tidyverse, xaringanExtra, Ryacas, rlang
+  tidyverse, Ryacas, rlang, JuliaCall
 )
+
 options(htmltools.dir.version = FALSE)
 knitr::opts_hooks$set(fig.callout = function(options) {
   if (options$fig.callout) {
@@ -29,13 +30,6 @@ knitr::opts_hooks$set(fig.callout = function(options) {
 knitr::opts_chunk$set(echo = TRUE, fig.align="center")
   options
 })
-```
-```{r xaringanExtra, echo = FALSE}
-xaringanExtra::use_xaringan_extra(c("tile_view", "panelset", "webcam"))
-
-```
-```{r echo=FALSE}
-xaringanExtra::style_panelset(panel_tab_color_active = "red")
 ```
 
 ```{css, echo=FALSE}
@@ -209,7 +203,7 @@ First you've gotta load your packages
 # Load packages via pacman package manager
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  tidyverse, tictoc, doFuture,
+  tidyverse, tictoc, doFuture, doRNG,
   fixest, broom, furrr, renv
 )
 ```
@@ -224,7 +218,7 @@ Next, you need to let your compute know you're going to do parallel processing
 
 ```{r}
 registerDoFuture()
-plan(multiprocess)
+plan(multisession)
 ```
 
 `registerDoFuture()` spins up the parallel computing infrastructure
@@ -282,8 +276,8 @@ Next we need to define our bootstrap function for estimation
 bootstrap_ses <- function(N) {
   df %>%
     dplyr::sample_frac(replace = TRUE) %>%
-    fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg + interact(year, state) |
-                    location_id + year, data = .) %>%
+    fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg |
+                    location_id + year^state, data = .) %>%
     broom::tidy() %>%
     dplyr::filter(stringr::str_detect(term, "gdppc")) %>%
     dplyr::select(estimate)
@@ -321,7 +315,7 @@ Next, lets run it in parallel using a parallel for loop
 
 ```{r}
 tic()
-dopar_feols <- foreach(n = seq(N)) %dopar% {
+dopar_feols <- foreach(n = seq(N)) %dorng% { # dorng ensures safe RNG in parallel
   bootstrap_ses(n)
 } %>%
   unlist() %>%
@@ -342,7 +336,7 @@ tic()
 furrr_feols <- future_map_dfr(
   seq(N),
   bootstrap_ses,
-  .options = future_options(globals = "df")
+  .options = furrr_options(globals = "df")
   ) %>%
   unlist() %>%
   as_tibble() %>%
@@ -466,7 +460,7 @@ First you've gotta load your packages onto each worker
 using Pkg
 Pkg.activate(".")
 Pkg.instantiate()
-using Distributed, Random
+using Distributed, Random, Statistics
 ```
 
 Julia has very nice built-in package manager, making it easy to generate reproducible code
@@ -482,7 +476,7 @@ addprocs(1)
 @everywhere using Pkg
 @everywhere Pkg.activate(".")
 @everywhere Pkg.instantiate()
-@everywhere using Queryverse, FixedEffectModels, SharedArrays
+@everywhere using DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase
 ```
 
 A quirk of Julia is you need to start off loading the packages onto each worker using `@everywhere`
@@ -504,8 +498,6 @@ This makes sure our results are reproducible
 ```{julia}
 df = DataFrame(load("data/final_panel.csv"))
 ```
-
-`Queryverse` is the Julia-equivalent of tidyverse for R
 
 ---
 
@@ -606,7 +598,7 @@ end
 
 ```{julia}
 results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
-describe(results, :standard_deviation => std)
+describe(results, :std)
 ```
 
 --
