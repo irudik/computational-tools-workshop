@@ -2,8 +2,7 @@
 
 ## Jupyter notebook introduction
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/irudik/computational-tools-workshop/master)
-
+[Jupyter notebook](https://raw.githack.com/irudik/computational-tools-workshop/master/jupyter-julia-intro.html)
 
 ## Hands on coding and parallel computing in R/Julia
 
