@@ -4,7 +4,7 @@ renv::restore()
 # load required packages
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  tidyverse, tictoc, doFuture,
+  tidyverse, tictoc, doFuture, doRNG,
   fixest, broom, furrr, renv
 )
 
@@ -50,7 +50,7 @@ times[["serial_feols"]] <- time$toc - time$tic
 
 # bootstrap in parallel with parallel for loop
 tic()
-dopar_feols <- foreach(n = seq(N)) %dopar% {
+dopar_feols <- foreach(n = seq(N)) %dorng% {
   bootstrap_ses(n)
 } %>%
   unlist() %>%
@@ -64,7 +64,7 @@ tic()
 furrr_feols <- future_map_dfr(
   seq(N),
   bootstrap_ses,
-  .options = future_options(globals = "df")
+  .options = future_options(globals = "df", seed = TRUE)
 ) %>%
   unlist() %>%
   as_tibble() %>%

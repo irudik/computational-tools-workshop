@@ -19,7 +19,7 @@ exclude: true
 ```{r setup}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  tidyverse, Ryacas, rlang, JuliaCall
+  tidyverse, Ryacas, rlang, JuliaCall, png, grid
 )
 options(htmltools.dir.version = FALSE)
 knitr::opts_hooks$set(fig.callout = function(options) {
@@ -58,6 +58,43 @@ knitr::opts_chunk$set(echo = TRUE, fig.align="center")
   border: 4px solid #23373B;
 }
 ```
+
+---
+
+# Benchmarking languages
+
+```{r fig.width=20, echo=FALSE}
+img <- readPNG("images/julia_basic_speeds.png")
+ grid.raster(img)
+```
+
+
+
+---
+
+# Benchmarking languages
+
+
+```{r fig.height=8, echo=FALSE}
+library(png)
+library(grid)
+img <- readPNG("images/julia_econ_speeds.png")
+ grid.raster(img)
+```
+
+---
+
+# Benchmarking languages
+
+Speed is sometimes (not always) important
+
+--
+
+You may want to choose which language you use based on computational speed
+
+--
+
+Ultimately you want some personally-optimal combo of computational speed, knowledge/ease of use, language capabilities, network size: maximize productivity and minimize total researcher time
 
 ---
 
@@ -335,7 +372,7 @@ tic()
 furrr_feols <- future_map_dfr(
   seq(N),
   bootstrap_ses,
-  .options = furrr_options(globals = "df")
+  .options = furrr_options(globals = "df", seed = TRUE)
   ) %>%
   unlist() %>%
   as_tibble() %>%
@@ -354,15 +391,15 @@ Now lets look at what we got:
 times
 ```
 
-Parallelization across 2 cores gets almost exactly 2x speed up
+Parallelization across 4 threads got us pretty good speed up
 
 ---
 
 # Now lets check the output
 
-Estimation is relatively expensive so the fixed costs of parallelizing aren't that big relative to the speed gains
+Estimation is not a trivial computation, so the fixed costs of parallelizing aren't that big relative to the speed gains
 
-`furrr` is generally slightly faster than `dopar` in addition to being better coding
+`furrr` is generally slightly faster than `dorng`
 
 --
 
@@ -380,73 +417,73 @@ bind_rows(serial_feols, dopar_feols, furrr_feols) %>%
 
 We get similar standard error estimates
 
-<!-- --- -->
+---
 
-<!-- # Julia -->
+# Julia
 
-<!-- You also don't need to pay to parallelize in R (nice) -->
+You also don't need to pay to parallelize in Julia (nice)
 
-<!-- -- -->
+--
 
-<!-- There's two main ways to parallelize in Julia, both have pros and cons: -->
-<!--   - `pmap` -->
-<!--   - `@distributed` -->
+There's two main ways to parallelize in Julia, both have pros and cons:
+  - `pmap`
+  - `@distributed`
 
-<!-- -- -->
+--
 
-<!-- Rule of thumb: use `pmap` with big jobs, use `@distributed` with smaller jobs -->
+Rule of thumb: use `pmap` with big jobs, use `@distributed` with smaller jobs
 
-<!-- --- -->
+---
 
-<!-- # Julia: pmap vs distributed -->
+# Julia: pmap vs distributed
 
-<!-- `pmap` is a parallel map -->
+`pmap` is a parallel map
 
-<!-- `@distributed` makes a parallel for loop like `%dopar%` in R -->
+`@distributed` makes a parallel for loop like `%dopar%` in R
 
-<!-- -- -->
+--
 
-<!-- What's the difference? -->
+What's the difference?
 
-<!-- -- -->
+--
 
-<!-- `@distributed` takes a quick and dirty approach: it just assigns the same number of jobs to each worker -->
+`@distributed` takes a quick and dirty approach: it just assigns the same number of jobs to each worker
 
-<!-- -- -->
+--
 
-<!-- This can cause inefficiencies if you have jobs with different execution times, leaving you hanging with one worker with several jobs left to do when they could be spread out over many workers -->
+This can cause inefficiencies if you have jobs with different execution times, leaving you hanging with one worker with several jobs left to do when they could be spread out over many workers
 
-<!-- -- -->
+--
 
-<!-- The benefit is it's quick: just send the jobs to the workers and wait -->
+The benefit is it's quick: just send the jobs to the workers and wait
 
-<!-- --- -->
+---
 
-<!-- # Julia: pmap vs distributed -->
+# Julia: pmap vs distributed
 
-<!-- `pmap` does .hi-blue[load balancing / dynamic scheduling:] it assigns jobs to workers as they complete jobs -->
+`pmap` does .hi-blue[load balancing / dynamic scheduling:] it assigns jobs to workers as they complete jobs
 
-<!-- -- -->
+--
 
-<!-- This makes sure workers are always busy and not idle -->
+This makes sure workers are always busy and not idle
 
-<!-- -- -->
+--
 
-<!-- But there's a fixed cost communication overhead with load balancing: if you have small easy jobs that are similar size, this will dominate the gains from load balancing -->
+But there's a fixed cost communication overhead with load balancing: if you have small easy jobs that are similar size, this will dominate the gains from load balancing
 
-<!-- --- -->
+---
 
-<!-- # Julia -->
+# Julia
 
-<!-- Required packages for the Julia code: `Pkg, Distributed, Random, DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics` -->
+Required packages for the Julia code: `Pkg, DataFrames, CSV, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase`
 
-<!-- -- -->
+--
 
-<!-- The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the `renv` package -->
+The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the Julia `Pkg` environment manager
 
-<!-- -- -->
+--
 
-<!-- Again, we will be .hi-red[bootstrapping standard errors] in parallel -->
+Again, we will be .hi-red[bootstrapping standard errors] in parallel
 
 
 <!-- --- -->
