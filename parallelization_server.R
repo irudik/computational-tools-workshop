@@ -1,5 +1,5 @@
 # install/link packages in renv lockfile
-renv::restore()
+# renv::restore()
 
 # load required packages
 if (!require("pacman")) install.packages("pacman")
@@ -32,8 +32,8 @@ bootstrap_samples <- tibble()
 bootstrap_ses <- function(N) {
   df %>%
     dplyr::sample_frac(replace = TRUE) %>%
-    fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg + interact(year, state) |
-                    location_id + year, data = .) %>%
+    fixest::feols(I(log(abundance)) ~ I(log(gdppc)) + temp_avg + precip_avg |
+                    location_id + year + year^state, data = .) %>%
     broom::tidy() %>%
     dplyr::filter(stringr::str_detect(term, "gdppc")) %>%
     dplyr::select(estimate)
