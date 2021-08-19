@@ -13,13 +13,13 @@ addprocs(convert(Int64, length(Sys.cpu_info())/2))
 @everywhere using Pkg
 @everywhere Pkg.activate(".")
 @everywhere Pkg.instantiate()
-@everywhere using DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase
+@everywhere using DataFrames, CSV, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase
 
 # set RNG seed
 Random.seed!(1234321)
 
 # load data
-df = DataFrame(load("data/final_panel.csv"))
+df = CSV.read("data/final_panel.csv", DataFrame)
 
 # set number of bootstraps
 N = 200
