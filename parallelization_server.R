@@ -10,7 +10,7 @@ pacman::p_load(
 
 # set up parallelization
 registerDoFuture()
-plan(multiprocess)
+plan(multicore)
 
 # set RNG seed
 set.seed(1234321)
