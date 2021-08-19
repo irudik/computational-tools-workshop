@@ -23,6 +23,13 @@
       "Repository": "RSPM",
       "Hash": "cc8c8c4d61346cde1ca60030ff9c241f"
     },
+    "JuliaCall": {
+      "Package": "JuliaCall",
+      "Version": "0.17.4",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "22da9a2213d3fb76de7aa75ccfb6c827"
+    },
     "MASS": {
       "Package": "MASS",
       "Version": "7.3-51.6",
@@ -394,6 +401,13 @@
       "Repository": "RSPM",
       "Hash": "af2c2531e55df5cf230c4b5444fc973c"
     },
+    "httpuv": {
+      "Package": "httpuv",
+      "Version": "1.6.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "54344a78aae37bc6ef39b1240969df8e"
+    },
     "httr": {
       "Package": "httr",
       "Version": "1.4.2",
@@ -442,6 +456,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "3d5108641f47470611a32d0bdf357a72"
+    },
+    "later": {
+      "Package": "later",
+      "Version": "1.2.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "b61890ae77fea19fc8acadd25db70aa4"
     },
     "lattice": {
       "Package": "lattice",
@@ -583,6 +604,13 @@
       "Repository": "RSPM",
       "Hash": "14dc9f7a3c91ebb14ec5bb9208a07061"
     },
+    "promises": {
+      "Package": "promises",
+      "Version": "1.2.0.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "4ab2c43adb4d4699cf3690acd378d75d"
+    },
     "ps": {
       "Package": "ps",
       "Version": "1.6.0",
@@ -709,6 +737,13 @@
       "Repository": "RSPM",
       "Hash": "3838071b66e0c566d55cc26bd6e27bf4"
     },
+    "servr": {
+      "Package": "servr",
+      "Version": "0.23",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "75a40cd4f8503fe175be6b213009767f"
+    },
     "stringi": {
       "Package": "stringi",
       "Version": "1.7.3",
@@ -820,6 +855,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "ad03909b44677f930fa156d47d7a3aeb"
+    },
+    "xaringan": {
+      "Package": "xaringan",
+      "Version": "0.22",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "c0ed5b878f24730ed7f4afbb95af84ae"
     },
     "xfun": {
       "Package": "xfun",

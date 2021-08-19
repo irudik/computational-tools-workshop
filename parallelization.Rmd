@@ -21,7 +21,6 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
   tidyverse, Ryacas, rlang, JuliaCall
 )
-
 options(htmltools.dir.version = FALSE)
 knitr::opts_hooks$set(fig.callout = function(options) {
   if (options$fig.callout) {
@@ -381,226 +380,225 @@ bind_rows(serial_feols, dopar_feols, furrr_feols) %>%
 
 We get similar standard error estimates
 
----
+<!-- --- -->
 
-# Julia
+<!-- # Julia -->
 
-You also don't need to pay to parallelize in R (nice)
+<!-- You also don't need to pay to parallelize in R (nice) -->
 
---
+<!-- -- -->
 
-There's two main ways to parallelize in Julia, both have pros and cons:
-  - `pmap`
-  - `@distributed`
+<!-- There's two main ways to parallelize in Julia, both have pros and cons: -->
+<!--   - `pmap` -->
+<!--   - `@distributed` -->
 
---
+<!-- -- -->
 
-Rule of thumb: use `pmap` with big jobs, use `@distributed` with smaller jobs
+<!-- Rule of thumb: use `pmap` with big jobs, use `@distributed` with smaller jobs -->
 
----
+<!-- --- -->
 
-# Julia: pmap vs distributed
+<!-- # Julia: pmap vs distributed -->
 
-`pmap` is a parallel map
+<!-- `pmap` is a parallel map -->
 
-`@distributed` makes a parallel for loop like `%dopar%` in R
+<!-- `@distributed` makes a parallel for loop like `%dopar%` in R -->
 
---
+<!-- -- -->
 
-What's the difference?
+<!-- What's the difference? -->
 
---
+<!-- -- -->
 
-`@distributed` takes a quick and dirty approach: it just assigns the same number of jobs to each worker
+<!-- `@distributed` takes a quick and dirty approach: it just assigns the same number of jobs to each worker -->
 
---
+<!-- -- -->
 
-This can cause inefficiencies if you have jobs with different execution times, leaving you hanging with one worker with several jobs left to do when they could be spread out over many workers
+<!-- This can cause inefficiencies if you have jobs with different execution times, leaving you hanging with one worker with several jobs left to do when they could be spread out over many workers -->
 
---
+<!-- -- -->
 
-The benefit is it's quick: just send the jobs to the workers and wait
+<!-- The benefit is it's quick: just send the jobs to the workers and wait -->
 
----
+<!-- --- -->
 
-# Julia: pmap vs distributed
+<!-- # Julia: pmap vs distributed -->
 
-`pmap` does .hi-blue[load balancing / dynamic scheduling:] it assigns jobs to workers as they complete jobs
+<!-- `pmap` does .hi-blue[load balancing / dynamic scheduling:] it assigns jobs to workers as they complete jobs -->
 
---
+<!-- -- -->
 
-This makes sure workers are always busy and not idle
+<!-- This makes sure workers are always busy and not idle -->
 
---
+<!-- -- -->
 
-But there's a fixed cost communication overhead with load balancing: if you have small easy jobs that are similar size, this will dominate the gains from load balancing
+<!-- But there's a fixed cost communication overhead with load balancing: if you have small easy jobs that are similar size, this will dominate the gains from load balancing -->
 
----
+<!-- --- -->
 
-# Julia
+<!-- # Julia -->
 
-Required packages for the Julia code: `Pkg, Distributed, Random, DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics`
+<!-- Required packages for the Julia code: `Pkg, Distributed, Random, DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics` -->
 
---
+<!-- -- -->
 
-The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the `renv` package
+<!-- The GitHub repo `irudik/computational-tools-workshop` has everything ready to go with matching package versions using the `renv` package -->
 
---
+<!-- -- -->
 
-Again, we will be .hi-red[bootstrapping standard errors] in parallel
+<!-- Again, we will be .hi-red[bootstrapping standard errors] in parallel -->
 
 
----
+<!-- --- -->
 
-# Julia Step 1: Load packages
+<!-- # Julia Step 1: Load packages -->
 
-First you've gotta load your packages onto each worker
+<!-- First you've gotta load your packages onto each worker -->
 
-```{julia}
-using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
-using Distributed, Random, Statistics
-```
+<!-- ```{julia} -->
+<!-- using Pkg -->
+<!-- #Pkg.activate(".") -->
+<!-- #Pkg.instantiate() -->
+<!-- using Distributed, Random, Statistics, StatsBase, DataFrames, FixedEffectModels, SharedArrays, CSV -->
+<!-- ``` -->
 
-Julia has very nice built-in package manager, making it easy to generate reproducible code
+<!-- Julia has very nice built-in package manager, making it easy to generate reproducible code -->
 
 
----
+<!-- --- -->
 
-# Julia Step 2: Instantiate parallel processing infrastructure
-```{julia}
-# add 1 worker
-addprocs(1)
+<!-- # Julia Step 2: Instantiate parallel processing infrastructure -->
+<!-- ```{julia} -->
+<!-- # add 1 worker -->
+<!-- # addprocs(1) -->
 
-@everywhere using Pkg
-@everywhere Pkg.activate(".")
-@everywhere Pkg.instantiate()
-@everywhere using DataFrames, CSVFiles, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase
-```
+<!-- @everywhere using Pkg -->
+<!-- #@everywhere Pkg.activate(".") -->
+<!-- #@everywhere Pkg.instantiate() -->
+<!-- @everywhere using StatsBase, DataFrames, FixedEffectModels, SharedArrays, Statistics, Random, CSV -->
+<!-- ``` -->
 
-A quirk of Julia is you need to start off loading the packages onto each worker using `@everywhere`
+<!-- A quirk of Julia is you need to start off loading the packages onto each worker using `@everywhere` -->
 
----
+<!-- --- -->
 
-# Julia Step 3: Initialize RNG seed
+<!-- # Julia Step 3: Initialize RNG seed -->
 
-```{julia}
-Random.seed!(1234321)
-```
+<!-- ```{julia} -->
+<!-- Random.seed!(1234321) -->
+<!-- ``` -->
 
-This makes sure our results are reproducible
+<!-- This makes sure our results are reproducible -->
 
----
+<!-- --- -->
 
-# Julia Step 4: Load data
+<!-- # Julia Step 4: Load data -->
 
-```{julia}
-df = DataFrame(load("data/final_panel.csv"))
-```
+<!-- ```{julia} -->
+<!-- df = DataFrame(CSV.read("data/final_panel.csv", DataFrame)) -->
+<!-- ``` -->
 
----
+<!-- --- -->
 
-# Julia Step 5: Define parameters
+<!-- # Julia Step 5: Define parameters -->
 
-```{julia}
-N = 200
-estimates_serial = Vector{Float64}(undef, N)
-estimates_distrib = SharedArray{Float64}(N)
-```
+<!-- ```{julia} -->
+<!-- N = 200 -->
+<!-- estimates_serial = Vector{Float64}(undef, N) -->
+<!-- estimates_distrib = SharedArray{Float64}(N) -->
+<!-- ``` -->
 
-We need to initialize `Array`s for the serial and `@distributed` results, not for `pmap`
+<!-- We need to initialize `Array`s for the serial and `@distributed` results, not for `pmap` -->
 
----
+<!-- --- -->
 
-# Julia Step 6: Define function
+<!-- # Julia Step 6: Define function -->
 
-Now we define our bootstrap function
+<!-- Now we define our bootstrap function -->
 
-```{julia}
-@everywhere function bootstrap_ses(df)
-    bootstrap_df = df[sample(axes(df, 1), nrow(df); replace = true), :]
-    reg_output = reg(bootstrap_df,
-        @formula(log(abundance) ~ log(gdppc) + temp_avg + precip_avg + fe(state)&year + fe(location_id) + fe(year)))
+<!-- ```{julia} -->
+<!-- @everywhere function bootstrap_ses(df) -->
+<!--     bootstrap_df = df[sample(axes(df, 1), nrow(df); replace = true), :] -->
+<!--     # reg_output = reg(bootstrap_df, @formula(log(abundance) ~ log(gdppc) + temp_avg + precip_avg)) -->
 
-    return reg_output.coef[1]
-end
-```
+<!--     return df[1,1] -->
+<!-- end -->
+<!-- ``` -->
 
-The `@everywhere` macro makes sure its defined on all workers
+<!-- The `@everywhere` macro makes sure its defined on all workers -->
 
----
+<!-- --- -->
 
-# Julia Step 7: Execute function (pre-compile)
+<!-- # Julia Step 7: Execute function (pre-compile) -->
 
-In Julia you often get massive speed gains by executing your function once before doing your main work
+<!-- In Julia you often get massive speed gains by executing your function once before doing your main work -->
 
---
+<!-- -- -->
 
-This is because it pre-compiles the function
+<!-- This is because it pre-compiles the function -->
 
-```{julia, echo = FALSE, results = "hide"}
+<!-- ```{julia, echo = FALSE, results = "hide"} -->
 
-# serial
-@time for i in 1:N
-  estimates_serial[i] = bootstrap_ses(df)
-end
+<!-- # serial -->
+<!-- @time for i in 1:N -->
+<!--   estimates_serial[i] = bootstrap_ses(df) -->
+<!-- end -->
 
-# parallel map
-@time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N])
+<!-- # parallel map -->
+<!-- @time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N]) -->
 
-# distributed
-@time @sync @distributed for i in 1:N
-  estimates_distrib[i] = bootstrap_ses(df)
-end
-```
+<!-- # distributed -->
+<!-- @time @sync @distributed for i in 1:N -->
+<!--   estimates_distrib[i] = bootstrap_ses(df) -->
+<!-- end -->
+<!-- ``` -->
 
----
+<!-- --- -->
 
-# Julia Step 7: Execute function
+<!-- # Julia Step 7: Execute function -->
 
-First lets run it sequentially
+<!-- First lets run it sequentially -->
 
-```{julia}
-@time for i in 1:N
-  estimates_serial[i] = bootstrap_ses(df)
-end
-```
+<!-- ```{julia} -->
+<!-- @time for i in 1:N -->
+<!--   estimates_serial[i] = bootstrap_ses(df) -->
+<!-- end -->
+<!-- ``` -->
 
 
----
+<!-- --- -->
 
-# Julia Step 7: Execute function
+<!-- # Julia Step 7: Execute function -->
 
-First lets use `pmap` to do load-balancing
+<!-- First lets use `pmap` to do load-balancing -->
 
-```{julia}
-@time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N])
-```
+<!-- ```{julia} -->
+<!-- @time estimates_pmap = pmap(bootstrap_ses, [df for i in 1:N]) -->
+<!-- ``` -->
 
 
----
+<!-- --- -->
 
-# Julia Step 7: Execute function
+<!-- # Julia Step 7: Execute function -->
 
-Last lets use `@distributed` to do it quick and dirty
+<!-- Last lets use `@distributed` to do it quick and dirty -->
 
-```{julia}
-@time @sync @distributed for i in 1:N
-  estimates_distrib[i] = bootstrap_ses(df)
-end
-```
+<!-- ```{julia} -->
+<!-- @time @sync @distributed for i in 1:N -->
+<!--   estimates_distrib[i] = bootstrap_ses(df) -->
+<!-- end -->
+<!-- ``` -->
 
 
----
+<!-- --- -->
 
-# Now lets check the output
+<!-- # Now lets check the output -->
 
-```{julia}
-results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
-describe(results, :std)
-```
+<!-- ```{julia} -->
+<!-- results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib); -->
+<!-- describe(results, :std) -->
+<!-- ``` -->
 
---
+<!-- -- -->
 
-Clone the github repo and use `parallelization_server.jl` on the BioHPC servers to see if $#$ cores speed-up holds more generally
+<!-- Clone the github repo and use `parallelization_server.jl` on the BioHPC servers to see if $#$ cores speed-up holds more generally -->
