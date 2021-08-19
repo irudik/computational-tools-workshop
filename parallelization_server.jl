@@ -1,3 +1,7 @@
+#######################
+### PACKAGE LOADING
+#######################
+
 # load and install packages on main core
 # run(`pip install xlrd`) # install python xlrd package if not on biohpc
 using Pkg
@@ -8,12 +12,15 @@ using Distributed, Random, Statistics
 # add other workers
 addprocs(convert(Int64, length(Sys.cpu_info())/2))
 
-
 # load and install packages on all cores
 @everywhere using Pkg
 @everywhere Pkg.activate(".")
 @everywhere Pkg.instantiate()
 @everywhere using DataFrames, CSV, FixedEffectModels, SharedArrays, Statistics, Random, StatsBase
+
+#######################
+### INITIALIZE
+#######################
 
 # set RNG seed
 Random.seed!(1234321)
@@ -37,7 +44,9 @@ estimates_distrib = SharedArray{Float64}(N);
     return reg_output.coef[1]
 end
 
-#### pre-compile
+#######################
+### PRECOMPILE
+#######################
 
 # serial
 @time for i in 1:N
@@ -52,7 +61,9 @@ end
   estimates_distrib[i] = bootstrap_ses(df)
 end
 
-#### actual computation time
+#######################
+### ACTUAL RUN
+#######################
 
 @time for i in 1:N
   estimates_serial[i] = bootstrap_ses(df)
@@ -64,5 +75,9 @@ end
   estimates_distrib[i] = bootstrap_ses(df)
 end
 
+#######################
+### RESULTS
+#######################
+
 results = DataFrame(serial = estimates_serial, pmap = estimates_pmap, distrib = estimates_distrib);
-describe(results, :std)
+std_devs = describe(results, :std)
